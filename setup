@@ -1,0 +1,73 @@
+#Update and Upgrade Kali Linux
+sudo apt update && sudo apt upgrade -y
+
+#Install Docker
+sudo apt install docker.io docker-compose -y
+
+#Start and enable Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+#Add your user to the docker group to avoid using sudo for Docker commands
+sudo usermod -aG docker $USER
+
+#Verify Docker installation
+docker --version
+docker-compose --version
+
+#Enable Adapter 2 and setup Host-Only Network and create new one
+ip a #eth0 and eth1
+
+#Assign a Static IP to eth1
+sudo nano /etc/network/interfaces
+#auto eth1
+#iface eth1 inet static
+#address 192.168.90.10
+#netmask 255.255.255.0
+sudo systemctl restart networking
+
+#Install tcpdump (Packet Capture)
+sudo apt install tcpdump -y
+
+#Install Wireshark (Traffic Analysis)
+sudo apt install wireshark -y
+
+#Install Suricata (Intrusion Detection)
+sudo apt install suricata -y
+
+#Install ELK Stack (Logging and Visualization)
+git clone https://github.com/deviantony/docker-elk.git
+cd docker-elk
+docker-compose up -d
+#Access Kibana at http://localhost:5601
+
+#Deploy Conpot (IoT Device Emulation)
+docker run -d -p 80:80 -p 102:102 --name conpot honeynet/conpot
+
+#Deploy Cowrie (SSH/Telnet Honeypot)
+docker run -d -p 2222:2222 --name cowrie cowrie/cowrie
+
+#Capture Traffic with tcpdump
+sudo tcpdump -i eth1 -w honeypot_traffic.pcap
+
+#Analyze Traffic with Wireshark
+wireshark honeypot_traffic.pcap
+
+#Configure Intrusion Detection
+sudo nano /etc/suricata/suricata.yaml #Set the interface to eth1 (honeypot network)
+sudo suricata -c /etc/suricata/suricata.yaml -i eth1 #Start Suricata
+
+#Install Nmap
+sudo apt install nmap
+
+#Use Nmap to scan the honeypot
+nmap -sV -p 22,80,102 <honeypot-ip>
+
+#Install Hydra
+sudo apt install hydra
+
+#Create a passwords.txt file
+echo -e "password\n123456\nadmin\nroot" > passwords.txt
+
+#Use Hydra for SSH brute force
+hydra -l root -P passwords.txt ssh://<honeypot-ip>:2222
