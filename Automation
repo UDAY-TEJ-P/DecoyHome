@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# Script to automate the first 25% of the DecoyHome project
+# This script installs dependencies, sets up honeypots, and starts services.
+
+# Update and install dependencies
+echo "Updating system and installing dependencies..."
+sudo apt update
+sudo apt install -y docker.io docker-compose tcpdump wireshark
+
+# Start Docker service
+echo "Starting Docker service..."
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Create a directory for DecoyHome
+echo "Creating DecoyHome directory..."
+mkdir -p ~/DecoyHome
+cd ~/DecoyHome
+
+# Create a Docker Compose file for ELK Stack
+echo "Setting up ELK Stack using Docker Compose..."
+cat <<EOL > docker-compose.yml
+version: '3'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.10.1
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+    networks:
+      - elk
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.10.1
+    volumes:
+      - ./logstash-config:/usr/share/logstash/pipeline
+    ports:
+      - "5000:5000"
+    networks:
+      - elk
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.10.1
+    ports:
+      - "5601:5601"
+    networks:
+      - elk
+    depends_on:
+      - elasticsearch
+
+networks:
+  elk:
+    driver: bridge
+EOL
+
+# Start ELK Stack
+echo "Starting ELK Stack..."
+docker-compose up -d
+
+# Deploy Conpot (IoT Honeypot)
+echo "Deploying Conpot..."
+docker run -d -p 80:80 -p 102:102 --name conpot honeynet/conpot
+
+# Deploy Cowrie (SSH/Telnet Honeypot)
+echo "Deploying Cowrie..."
+docker run -d -p 2222:2222 --name cowrie cowrie/cowrie
+
+# Set up tcpdump for traffic capture
+echo "Setting up tcpdump for traffic capture..."
+sudo tcpdump -i eth1 -w ~/DecoyHome/honeypot_traffic.pcap &
+
+# Install and configure Suricata (Intrusion Detection System)
+echo "Installing Suricata..."
+sudo apt install -y suricata
+echo "Configuring Suricata to monitor eth1..."
+sudo suricata -c /etc/suricata/suricata.yaml -i eth1 &
+
+# Verify services are running
+echo "Verifying services..."
+docker ps
+sudo systemctl status suricata
+
+# Display instructions for accessing services
+echo "DecoyHome setup complete!"
+echo "Access Kibana at http://localhost:5601"
+echo "Conpot is running on port 80 (HTTP) and 102 (Modbus)"
+echo "Cowrie is running on port 2222 (SSH/Telnet)"
+echo "Traffic is being captured to ~/DecoyHome/honeypot_traffic.pcap"
+
+# End of script
