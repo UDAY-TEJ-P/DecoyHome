@@ -1,0 +1,15 @@
+sudo systemctl start docker
+sudo systemctl enable docker
+docker start conpot
+docker start cowrie
+docker run -d -p 80:80 -p 102:102 --name conpot honeynet/conpot
+docker run -d -p 2222:2222 --name cowrie cowrie/cowrie
+sudo tcpdump -i eth1 -w honeypot_traffic.pcap
+wireshark honeypot_traffic.pcap
+sudo suricata -c /etc/suricata/suricata.yaml -i eth1
+nmap -sV -p 22,80,102 192.168.90.10
+hydra -l root -P passwords.txt ssh://192.168.90.10:2222
+
+
+docker logs cowrie
+sudo tcpdump -r honeypot_traffic.pcap
